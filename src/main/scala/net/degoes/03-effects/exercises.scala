@@ -119,10 +119,8 @@ object zio_background {
   }
   def ageExplainer2: Program[Unit] =
     for {
-      _        <- writeLine("What is your age?")
-      maybeAge <- readLine.map(v => Try(v.toInt).toOption)
-    } yield
-      maybeAge match {
+      _ <- writeLine("What is your age?")
+      _ <- readLine.map(v => Try(v.toInt).toOption).flatMap {
         case Some(age) if age < 12  => writeLine("You are a kid")
         case Some(age) if age < 20  => writeLine("You are a teenager")
         case Some(age) if age < 30  => writeLine("You are a grownup")
@@ -132,6 +130,8 @@ object zio_background {
         case Some(_)                => writeLine("You are probably lying.")
         case None                   => writeLine("That's not an age, try again").flatMap(_ => ageExplainer2)
       }
+    } yield ()
+
 }
 
 object zio_type {
