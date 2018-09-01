@@ -68,9 +68,10 @@ object zio_background {
       case WriteLine(line, next: Program[A]) =>
         println(line)
         interpret(next)
-      case Chain(previous: Program[Any], next: (Any => Program[A])) =>
+      case Chain(previous, next) =>
         val a0 = interpret(previous)
-        interpret(next(a0))
+        /*_*/
+        interpret(next(a0)) /*_*/
     }
 
   //
