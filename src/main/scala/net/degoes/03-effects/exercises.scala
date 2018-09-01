@@ -10,11 +10,8 @@ object zio_background {
   sealed trait Program[A] { self =>
     import Program.{Chain, Return}
 
-    final def map[B](f: A => B): Program[B] =
-      Chain(self, f.andThen(Return(_)))
-
-    final def flatMap[B](f: A => Program[B]): Program[B] =
-      Chain(self, f)
+    final def map[B](f: A => B): Program[B]              = Chain(self, f.andThen(Return(_)))
+    final def flatMap[B](f: A => Program[B]): Program[B] = Chain(self, f)
   }
   object Program {
     final case class ReadLine[A](next: String => Program[A])                     extends Program[A]
