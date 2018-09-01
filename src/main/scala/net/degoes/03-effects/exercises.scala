@@ -24,7 +24,7 @@ object zio_background {
     def point[A](a: A): Program[A]             = Return(a)
   }
 
-  import Program.{readLine, writeLine, point}
+  import Program._
 
   val yourName1: Program[Unit] =
     for {
@@ -61,7 +61,17 @@ object zio_background {
   // Implement the following effectful procedure, which interprets
   // `Program[A]` into `A`. You can use this procedure to "run" programs.
   //
-  def interpret[A](program: Program[A]): A = ???
+  def interpret[A](program: Program[A]): A =
+    program match {
+      case Return(a)      => a
+      case ReadLine(next) => interpret(next(scala.io.StdIn.readLine()))
+      case WriteLine(line, next: Program[A]) =>
+        println(line)
+        interpret(next)
+      case Chain(previous: Program[Any], next: (Any => Program[A])) =>
+        val a = interpret(previous)
+        interpret(next(a))
+    }
 
   //
   // EXERCISE 4
