@@ -130,7 +130,7 @@ object zio_background {
         case Some(age) if age < 80  => writeLine("You are a mature adult")
         case Some(age) if age < 100 => writeLine("You are elderly")
         case Some(_)                => writeLine("You are probably lying.")
-        case None                   => writeLine("That's not an age, try again").map(_ => ageExplainer2)
+        case None                   => writeLine("That's not an age, try again").flatMap(_ => ageExplainer2)
       }
 }
 
