@@ -2,6 +2,4 @@
 
 package net.degoes.abstractions
 
-object exercises {
-
-}
+object exercises {}

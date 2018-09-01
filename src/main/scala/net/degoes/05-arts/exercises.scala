@@ -2,6 +2,4 @@
 
 package net.degoes.arts
 
-object exercises {
-
-}
+object exercises {}
