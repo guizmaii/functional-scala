@@ -4,7 +4,9 @@ package net.degoes.effects
 
 import scalaz.zio._
 import scalaz.zio.console._
+
 import scala.concurrent.duration._
+import scala.util.Try
 
 object zio_background {
   sealed trait Program[A] { self =>
@@ -115,7 +117,21 @@ object zio_background {
     }
 
   }
-  def ageExplainer2: Program[Unit] = ???
+  def ageExplainer2: Program[Unit] =
+    for {
+      _        <- writeLine("What is your age?")
+      maybeAge <- readLine.map(v => Try(v.toInt).toOption)
+    } yield
+      maybeAge match {
+        case Some(age) if age < 12  => writeLine("You are a kid")
+        case Some(age) if age < 20  => writeLine("You are a teenager")
+        case Some(age) if age < 30  => writeLine("You are a grownup")
+        case Some(age) if age < 50  => writeLine("You are an adult")
+        case Some(age) if age < 80  => writeLine("You are a mature adult")
+        case Some(age) if age < 100 => writeLine("You are elderly")
+        case Some(_)                => writeLine("You are probably lying.")
+        case None                   => writeLine("That's not an age, try again").map(_ => ageExplainer2)
+      }
 }
 
 object zio_type {
