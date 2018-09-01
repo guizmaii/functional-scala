@@ -38,7 +38,7 @@ object zio_background {
   //
   // Rewrite `program1` to use a for comprehension.
   //
-  val yourName2: Program[Unit] = ???
+  val yourName2: Program[Unit] = yourName1
 
   //
   // EXERCISE 2
