@@ -21,6 +21,17 @@ object EffectsAsValues {
   final case class PutStrLn[A](line: String, next: Program[A])        extends Program[A]
   final case class Chain[A0, A](previous: A0, next: A0 => Program[A]) extends Program[A]
 
+  val getStinLn: Program[String] = GetStrLn(Program.point(_))
+  def putStrLn(line: String)     = PutStrLn(line, Return(()))
+
+  val myProgram: Program[Unit] =
+    for {
+      _    <- putStrLn("Hello")
+      _    <- println("world")
+      name <- getStinLn
+      _    <- println(s"your name: $name")
+    } yield ()
+
 }
 
 object exercises {}
