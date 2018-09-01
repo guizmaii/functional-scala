@@ -348,7 +348,7 @@ object zio_failure {
   //
   // Create an `IO[String, Int]` value that represents a failure with a string
   // error message, containing a user-readable description of the failure.
-  val stringFailure1: IO[String, Int] = ???
+  val stringFailure1: IO[String, Int] = IO.fail("error message containing a user-readable description of the failure")
 
   //
   // EXERCISE 2
@@ -356,7 +356,7 @@ object zio_failure {
   // Create an `IO[Int, String]` value that represents a failure with an integer
   // error code.
   //
-  val intFailure: IO[Int, String] = ???
+  val intFailure: IO[Int, String] = IO.fail(-1)
 
   //
   // EXERCISE 3
@@ -364,7 +364,7 @@ object zio_failure {
   // Transform the error of `intFailure` into its string representation using
   // the `leftMap` method of `IO`.
   //
-  val stringFailure2: IO[String, String] = intFailure ?
+  val stringFailure2: IO[String, String] = intFailure.leftMap(_.toString)
 
   //
   // EXERCISE 4
@@ -375,7 +375,11 @@ object zio_failure {
     if (i < 0 || i >= a.length)
       throw new IndexOutOfBoundsException("The index " + i + " is out of bounds [0, " + a.length + ")")
     else a(i)
-  def accessArr2[A](i: Int, a: Array[A]): IO[IndexOutOfBoundsException, A] = ???
+
+  def accessArr2[A](i: Int, a: Array[A]): IO[IndexOutOfBoundsException, A] =
+    if (i < 0 || i >= a.length)
+      IO.fail(new IndexOutOfBoundsException("The index " + i + " is out of bounds [0, " + a.length + ")"))
+    else IO.point(a(i))
 
   //
   // EXERCISE 5
@@ -387,7 +391,8 @@ object zio_failure {
   def divide1(n: Int, d: Int): IO[DenomIsZero, Int] =
     if (d == 0) IO.fail(DenomIsZero)
     else IO.now(n / d)
-  def divide2(n: Int, d: Int): Int = ???
+
+  def divide2(n: Int, d: Int): Int = ??? // impossible.
 
   //
   // EXERCISE 6
@@ -395,8 +400,8 @@ object zio_failure {
   // Recover from a division by zero error by returning `-1`.
   //
   val recovered1: IO[Nothing, Int] = divide1(100, 0).attempt.map {
-    case Left(error)  => ???
-    case Right(value) => ???
+    case Left(error)  => -1
+    case Right(value) => value
   }
 
   //
@@ -404,7 +409,7 @@ object zio_failure {
   //
   // Recover from a dvision by zero error by using `redeem`.
   //
-  val recovered2: IO[Nothing, Int] = divide1(100, 0).redeem(???, ???)
+  val recovered2: IO[Nothing, Int] = divide1(100, 0).redeem(_ => IO.now(-1), IO.now)
 
   //
   // EXERCISE 8
@@ -414,7 +419,7 @@ object zio_failure {
   //
   val firstChoice: IO[DenomIsZero, Int] = divide1(100, 0)
   val secondChoice: IO[Nothing, Int]    = IO.now(400)
-  val combined: IO[Nothing, Int]        = ???
+  val combined: IO[Nothing, Int]        = firstChoice.orElse(secondChoice)
 }
 
 object zio_effects {
