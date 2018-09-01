@@ -80,7 +80,16 @@ object zio_background {
   // Implement the following function, which shows how to write a combinator
   // that operates on programs.
   //
-  def sequence[A](programs: List[Program[A]]): Program[List[A]] = Return(programs.map(interpret))
+  // TODO: rewrite with tailrec function
+  def sequence[A](programs: List[Program[A]]): Program[List[A]] =
+    programs match {
+      case Nil => point(Nil)
+      case programHead :: programTail =>
+        for {
+          a  <- programHead
+          as <- sequence(programTail)
+        } yield a :: as
+    }
 
   //
   // EXERCISE 5
