@@ -27,9 +27,9 @@ object EffectsAsValues {
   val myProgram: Program[Unit] =
     for {
       _    <- putStrLn("Hello")
-      _    <- println("world")
+      _    <- putStrLn("world")
       name <- getStinLn
-      _    <- println(s"your name: $name")
+      _    <- putStrLn(s"your name: $name")
     } yield ()
 
 }
