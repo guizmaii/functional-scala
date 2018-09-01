@@ -208,14 +208,14 @@ object zio_composition {
   // Map the `IO[Nothing, Int]` into an `IO[Nothing, String]` by converting the
   // integer into its string rendering using the `map` method of `IO`.
   //
-  (IO.point(42) ? : IO[Nothing, String])
+  (IO.point(42).map(_.toString): IO[Nothing, String])
 
   //
   // EXERCISE 2
   //
   // Map the `IO[Int, Nothing]` into an `IO[String, Nothing]` by converting the
   // integer error into its string rendering using the `leftMap` method of `IO`.
-  (IO.fail(42) ? : IO[String, Nothing])
+  (IO.fail(42).leftMap(_.toString) ? : IO[String, Nothing])
 
   //
   // EXERCISE 3
@@ -224,15 +224,17 @@ object zio_composition {
   //
   val ioX: IO[Nothing, Int]      = IO.point(42)
   val ioY: IO[Nothing, Int]      = IO.point(58)
-  val ioXPlusY: IO[Nothing, Int] = ioX.flatMap(???)
+  val ioXPlusY: IO[Nothing, Int] = ioX.flatMap(a => ioY.map(_ + a))
 
   //
   // EXERCISE 4
   //
   // Using the `flatMap` method of `IO`, implement `ifThenElse`.
   //
-  def ifThenElse[E, A](bool: IO[E, Boolean])(ifTrue: IO[E, A], ifFalse: IO[E, A]): IO[E, A] = ???
-  val exampleIf                                                                             = ifThenElse(IO.point(true))(IO.point("It's true!"), IO.point("It's false!"))
+  def ifThenElse[E, A](bool: IO[E, Boolean])(ifTrue: IO[E, A], ifFalse: IO[E, A]): IO[E, A] =
+    bool.flatMap(if (_) ifTrue else ifFalse)
+
+  val exampleIf = ifThenElse(IO.point(true))(IO.point("It's true!"), IO.point("It's false!"))
 
   //
   // EXERCISE 5
@@ -246,6 +248,8 @@ object zio_composition {
     v3 <- IO.point("The Total Is: ")
   } yield v3 + (v1 + v2).toString
 
+  IO.point(42).par(IO.point(58)).map { case (v1, v2) => s"The Total Is: ${v1 + v2}" }
+
   //
   // EXERCISE 6
   //
@@ -256,11 +260,11 @@ object zio_composition {
     for {
       age1 <- spouse1
       age2 <- spouse2
-      rez <- if (((age1 + age2) / 2) < 40) IO.point("You don't have kids yet")
-      else IO.point("You might have kids yet")
+      rez  <- if (((age1 + age2) / 2) < 40) IO.point("You don't have kids yet") else IO.point("You might have kids yet")
     } yield rez
+
   def analyzeAverageAge2(spouse1: Int, spouse2: Int): String =
-    ???
+    if (((spouse1 + spouse2) / 2) < 40) "You don't have kids yet" else "You might have kids yet"
 
   //
   // EXERCISE 7
@@ -272,7 +276,9 @@ object zio_composition {
     if ((first + " " + last).length > 20) "Your full name is really long"
     else if ((first + last).contains(" ")) "Your name is really weird"
     else "Your name is pretty normal"
-  def analyzeName2(first: IO[Nothing, String], last: IO[Nothing, String]): IO[Nothing, String] = ???
+
+  def analyzeName2(first: IO[Nothing, String], last: IO[Nothing, String]): IO[Nothing, String] =
+    first.par(last).map((analyzeName1 _).tupled)
 
   //
   // EXERCISE 8
@@ -283,7 +289,11 @@ object zio_composition {
     case Nil     => acc
     case x :: xs => sumList1(xs, acc + x)
   }
-  def sumList2(ints: IO[Nothing, List[Int]], acc: IO[Nothing, Int]): IO[Nothing, Int] = ???
+  def sumList2(ints: IO[Nothing, List[Int]], acc: IO[Nothing, Int]): IO[Nothing, Int] =
+    ints.flatMap {
+      case Nil     => acc
+      case x :: xs => sumList2(IO.now(xs), acc.map(_ + x))
+    }
 
   //
   // EXERCISE 9
@@ -294,8 +304,13 @@ object zio_composition {
     if (int < 4) ()
     else if ((int / 2 + 2) == int) ()
     else decrementUntilFour1(int - 1)
+
   def decrementUntilFour2(int: IO[Nothing, Int]): IO[Nothing, Unit] =
-    ???
+    int.flatMap {
+      case i if i < 4            => IO.unit
+      case i if (i / 2 + 2) == i => IO.unit
+      case i                     => decrementUntilFour2(IO.now(i - 1))
+    }
 
   //
   // EXERCISE 10
@@ -303,6 +318,7 @@ object zio_composition {
   // Translate the following expression into its `flatMap` equivalent.
   //
   IO.point(42) *> IO.point(19)
+  IO.point(42).flatMap(_ => IO.point(19))
 
   //
   // EXERCISE 11
@@ -310,6 +326,7 @@ object zio_composition {
   // Translate the following expression into its `flatMap` equivalent.
   //
   IO.point(42) <* IO.point(19)
+  IO.point(42).flatMap(v => IO.point(19).map(_ => v))
 
   //
   // EXERCISE 12
@@ -317,6 +334,8 @@ object zio_composition {
   // Translate the following expression into its `flatMap` equivalent.
   //
   (IO.point(42) <* IO.point(19)) *> IO.point(1)
+  IO.point(42).flatMap(v => IO.point(19).map(_ => v)).flatMap(_ => IO.point(1))
+
 }
 
 object zio_failure {
