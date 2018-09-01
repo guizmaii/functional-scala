@@ -46,7 +46,11 @@ object zio_background {
   // Rewrite `yourName2` using the helper function `getName`, which shows how
   // to create larger programs from smaller programs.
   //
-  def yourName3: Program[Unit] = ???
+  def yourName3: Program[Unit] =
+    for {
+      name <- getName
+      _    <- writeLine("Hello, " + name + ", good to meet you!")
+    } yield point(())
 
   def getName: Program[String] =
     writeLine("What is your name?").flatMap(_ => readLine)
