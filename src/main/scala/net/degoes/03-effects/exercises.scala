@@ -143,7 +143,7 @@ object zio_type {
   // Write the type of `IO` values that can fail with an `Exception`, or
   // may produce an `A`.
   //
-  type Exceptional[A] = IO[???, ???]
+  type Exceptional[A] = IO[Exception, A]
 
   //
   // EXERCISE 2
@@ -151,14 +151,14 @@ object zio_type {
   // Write the type of `IO` values that can fail with a `Throwable`, or
   // may produce an `A`.
   //
-  type Task[A] = IO[???, ???]
+  type Task[A] = IO[Throwable, A]
 
   //
   // EXERCISE 3
   //
   // Write the type of `IO` values that cannot fail, but may produce an `A.`
   //
-  type Infallible[A] = IO[???, ???]
+  type Infallible[A] = IO[Nothing, A]
 
   //
   // EXERCISE 4
@@ -166,14 +166,14 @@ object zio_type {
   // Write the type of `IO` values that cannot produce a value, but may fail
   // with an `E`.
   //
-  type Unproductive[E] = IO[???, ???]
+  type Unproductive[E] = IO[E, Nothing]
 
   //
   // EXERCISE 5
   //
   // Write the type of `IO` values that cannot fail or produce a value.
   //
-  type Unending = IO[???, ???]
+  type Unending = IO[Nothing, Nothing]
 }
 
 object zio_values {
