@@ -16,10 +16,10 @@ object EffectsAsValues {
   object Program {
     final def point[A](a: => A): Program[A] = Return(a)
   }
-  final case class Return[A](a: A)                                    extends Program[A]
-  final case class GetStrLn[A](next: String => Program[A])            extends Program[A] // next is named a continuation.
-  final case class PutStrLn[A](line: String, next: Program[A])        extends Program[A]
-  final case class Chain[A0, A](previous: A0, next: A0 => Program[A]) extends Program[A]
+  final case class Return[A](a: A)                                             extends Program[A]
+  final case class GetStrLn[A](next: String => Program[A])                     extends Program[A] // next is named a continuation.
+  final case class PutStrLn[A](line: String, next: Program[A])                 extends Program[A]
+  final case class Chain[A0, A](previous: Program[A0], next: A0 => Program[A]) extends Program[A]
 
   val getStinLn: Program[String] = GetStrLn(Program.point(_))
   def putStrLn(line: String)     = PutStrLn(line, Return(()))
