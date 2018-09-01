@@ -27,9 +27,11 @@ object zio_background {
   import Program.{readLine, writeLine, point}
 
   val yourName1: Program[Unit] =
-    writeLine("What is your name?").flatMap(
-      _ => readLine.flatMap(name => writeLine("Hello, " + name + ", good to meet you!").flatMap(_ => point(())))
-    )
+    for {
+      _    <- writeLine("What is your name?")
+      name <- readLine
+      _    <- writeLine("Hello, " + name + ", good to meet you!")
+    } yield point(())
 
   //
   // EXERCISE 1
