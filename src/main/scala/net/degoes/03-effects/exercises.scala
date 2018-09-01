@@ -80,7 +80,7 @@ object zio_background {
   // Implement the following function, which shows how to write a combinator
   // that operates on programs.
   //
-  def sequence[A](programs: List[Program[A]]): Program[List[A]] = ???
+  def sequence[A](programs: List[Program[A]]): Program[List[A]] = Return(programs.map(interpret))
 
   //
   // EXERCISE 5
