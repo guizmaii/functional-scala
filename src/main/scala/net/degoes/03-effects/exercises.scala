@@ -2,6 +2,7 @@
 
 package net.degoes.effects
 
+import scalaz.zio.ExitResult.Completed
 import scalaz.zio._
 import scalaz.zio.console._
 
@@ -439,7 +440,7 @@ object zio_effects {
   // Using the `IO.sync` method, wrap Scala's `println` method to import it into
   // the world of pure functional programming.
   //
-  def putStrLn(line: String): IO[Nothing, Unit] = println ?
+  def putStrLn(line: String): IO[Nothing, Unit] = IO.sync(println(line))
 
   //
   // EXERCISE 2
@@ -447,7 +448,7 @@ object zio_effects {
   // Using the `IO.sync` method, wrap Scala's `readLine` method to import it
   // into the world of pure functional programming.
   //
-  val getStrLn: IO[Nothing, String] = readLine ?
+  val getStrLn: IO[Nothing, String] = IO.sync(readLine)
 
   //
   // EXERCISE 3
@@ -455,8 +456,7 @@ object zio_effects {
   // Using the `IO.syncException` method, wrap Scala's `getLines` method to
   // import it into the world of pure functional programming.
   //
-  def readFile(file: File): IO[Exception, List[String]] =
-    Source.fromFile(file).getLines.toList ?
+  def readFile(file: File): IO[Exception, List[String]] = IO.syncException(Source.fromFile(file).getLines.toList)
 
   //
   // EXERCISE 4
@@ -464,7 +464,7 @@ object zio_effects {
   // Identify the correct method and error type to import `System.nanoTime`
   // safely into the world of pure functional programming.
   //
-  def nanoTime: IO[???, Long] = System.nanoTime() ?
+  def nanoTime: IO[Nothing, Long] = IO.sync(System.nanoTime())
 
   //
   // EXERCISE 5
@@ -472,16 +472,18 @@ object zio_effects {
   // Identify the correct method, error, and value type to import `System.exit`
   // safely into the world of pure functional programming.
   //
-  def sysExit(code: Int): IO[???, ???] = System.exit(code) ?
 
+  // TODO: Finish
+  def sysExit(code: Int): IO[SecurityException, Nothing] = ??? //IO.syncCatch(System.exit(code))
   //
   // EXERCISE 6
   //
   // Identify the correct method, error, and value type to import
   // `Array.update` safely into the world of pure functional programming.
   //
-  def arrayUpdate[A](a: Array[A], i: Int, f: A => A): IO[???, ???] =
-    a.update(i, f(a(i))) ?
+  // TODO: Finish
+  def arrayUpdate[A](a: Array[A], i: Int, f: A => A): IO[IndexOutOfBoundsException, Unit] =
+    ??? //IO.syncCatch(a.update(i, f(a(i))))
 
   //
   // EXERCISE 7
@@ -490,17 +492,20 @@ object zio_effects {
   // choose the correct error type.
   //
   val scheduledExecutor = Executors.newScheduledThreadPool(1)
-  def sleep(l: Long, u: TimeUnit): IO[???, Unit] =
-    scheduledExecutor
-      .schedule(new Runnable {
-        def run(): Unit = ???
-      }, l, u) ?
+  def sleep(l: Long, u: TimeUnit): IO[Nothing, Unit] =
+    IO.async[Nothing, Unit] { cb =>
+      scheduledExecutor
+        .schedule(new Runnable {
+          def run(): Unit = cb(Completed(()))
+        }, l, u)
+    }
 
   //
   // EXERCISE 8
   //
   // Translate the following procedural program into ZIO.
   //
+  // TODO: Finish
   def playGame1(): Unit = {
     val number = scala.util.Random.nextInt(5)
     println("Enter a number between 0 - 5: ")
@@ -514,6 +519,7 @@ object zio_effects {
         println("You guessed wrong! The number was " + number)
     }
   }
+
   def playGame2: IO[Exception, Unit] = ???
 }
 
@@ -532,7 +538,7 @@ object zio_concurrency {
   //
   val leftContestent1  = IO.never
   val rightContestent1 = putStrLn("Hello World")
-  val raced1           = ???
+  val raced1           = leftContestent1 race rightContestent1
 
   //
   // EXERCISE 2
@@ -542,7 +548,7 @@ object zio_concurrency {
   //
   val leftContestent2: IO[Exception, Nothing] = IO.fail(new Exception("Uh oh!"))
   val rightContestent2: IO[Exception, Unit]   = IO.sleep(10.milliseconds) *> putStrLn("Hello World")
-  val raced2: ???                             = ???
+  val raced2: IO[Exception, Unit]             = leftContestent1 race rightContestent1
 
   //
   // EXERCISE 3
@@ -550,17 +556,17 @@ object zio_concurrency {
   // Compute `leftWork1` and `rightWork1` in parallel using the `par` method of
   // `IO`.
   //
-  val leftWork1: IO[Nothing, Int]  = fibonacci(10)
-  val rightWork1: IO[Nothing, Int] = fibonacci(10)
-  val par1: ???                    = ???
+  val leftWork1: IO[Nothing, Int]   = fibonacci(10)
+  val rightWork1: IO[Nothing, Int]  = fibonacci(10)
+  val par1: IO[Nothing, (Int, Int)] = leftWork1 par rightWork1
 
   //
   // EXERCISE 4
   //
   // Compute all values `workers` in parallel using `IO.parAll`.
   //
-  val workers: List[IO[Nothing, Int]]           = (1 to 10).toList.map(fibonacci(_))
-  val workersInParallel: IO[Nothing, List[Int]] = ???
+  val workers: List[IO[Nothing, Int]]           = (1 to 10).toList.map(fibonacci)
+  val workersInParallel: IO[Nothing, List[Int]] = IO.parAll(workers)
 
   //
   // EXERCISE 5
@@ -569,7 +575,12 @@ object zio_concurrency {
   // and yielding a tuple of their results.
   //
   def myPar[E, A, B](left: IO[E, A], right: IO[E, B]): IO[E, (A, B)] =
-    ???
+    for {
+      fiberL <- left.fork
+      fiberR <- right.fork
+      l      <- fiberL.join
+      r      <- fiberR.join
+    } yield (l, r)
 
   //
   // EXERCISE 6
@@ -580,7 +591,7 @@ object zio_concurrency {
   val supervisedExample: IO[Nothing, Unit] =
     (for {
       fiber <- fibonacci(10000).fork
-    } yield ()) ?
+    } yield ()).supervised
 
   //
   // EXERCISE 7
@@ -591,6 +602,7 @@ object zio_concurrency {
   val interrupted1: IO[Nothing, Unit] =
     for {
       fiber <- fibonacci(10000).fork
+      _     <- fiber.interrupt
     } yield ()
 
   //
