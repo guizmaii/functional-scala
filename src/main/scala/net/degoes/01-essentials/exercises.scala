@@ -659,7 +659,12 @@ object higher_kinded {
       bind(fa)(f andThen single)
     }
   }
-  val ListCollectionLike: CollectionLike[List] = ???
+  val ListCollectionLike: CollectionLike[List] =
+    new CollectionLike[List] {
+      override def empty[A]: List[A]                            = Nil
+      override def cons[A](a: A, as: List[A]): List[A]          = a +: as
+      override def uncons[A](as: List[A]): Option[(A, List[A])] = ???
+    }
 
   //
   // EXERCISE 8
