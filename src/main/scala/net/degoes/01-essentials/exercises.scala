@@ -4,6 +4,11 @@ package net.degoes.essentials
 
 import java.util.Date
 
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
+import scala.util.Try
+
 object types {
   type ??? = Nothing
 
@@ -176,25 +181,30 @@ object functions {
   //
   // Convert the following partial function into a total function.
   //
-  def parseInt1(s: String): Int = s.toInt
-  def parseInt2(s: String): ??? = ???
+  def parseInt1(s: String): Int         = s.toInt               // impure. Lying function.
+  def parseInt2(s: String): Option[Int] = Try(s.toInt).toOption // Pure
 
   //
   // EXERCISE 2
   //
   // Convert the following non-function into a function.
   //
-  def arrayUpdate1[A](arr: Array[A], i: Int, f: A => A): Unit =
-    arr.updated(i, f(arr(i)))
-  def arrayUpdate2[A](arr: Array[A], i: Int, f: A => A): ??? = ???
+  def arrayUpdate1[A](arr: Array[A], i: Int, f: A => A): Unit = arr.updated(i, f(arr(i)))
+  def arrayUpdate2[A: ClassTag](arr: Array[A], i: Int, f: A => A): Array[A] = // TODO: possible without shitty `ClassTag` thing ?
+    arr.zipWithIndex
+      .foldLeft(ArrayBuffer.empty[A]) {
+        case (acc, (a, index)) => acc += (if (index == i) f(a) else a)
+      }
+      .toArray
+  def arrayUpdate3[A](arr: Array[A], i: Int, f: A => A): Option[Array[A]] = ???
 
   //
   // EXERCISE 3
   //
   // Convert the following non-function into a function.
   //
-  def divide1(a: Int, b: Int): Int = a / b
-  def divide2(a: Int, b: Int): ??? = ???
+  def divide1(a: Int, b: Int): Int         = a / b
+  def divide2(a: Int, b: Int): Option[Int] = if (b == 0) None else Some(a / b)
 
   //
   // EXERCISE 4
@@ -207,7 +217,7 @@ object functions {
     id += 1
     newId
   }
-  def freshId2( /* ??? */ ): (Int, Int) = ???
+  def freshId2(id: Int): (Int, Int) = (id, id + 1)
 
   //
   // EXERCISE 5
@@ -215,8 +225,8 @@ object functions {
   // Convert the following non-function into a function.
   //
   import java.time.LocalDateTime
-  def afterOneHour1: LocalDateTime              = LocalDateTime.now.plusHours(1)
-  def afterOneHour2( /* ??? */ ): LocalDateTime = ???
+  def afterOneHour1: LocalDateTime                     = LocalDateTime.now.plusHours(1)
+  def afterOneHour2(now: LocalDateTime): LocalDateTime = now.plusHours(1)
 
   //
   // EXERCISE 6
@@ -227,7 +237,7 @@ object functions {
     if (as.length == 0) println("Oh no, it's impossible!!!")
     as.head
   }
-  def head2[A](as: List[A]): ??? = ???
+  def head2[A](as: List[A]): Option[A] = as.headOption
 
   //
   // EXERCISE 7
@@ -246,29 +256,40 @@ object functions {
     processor.charge(account, coffee.price)
     coffee
   }
-  final case class Charge( /* ??? */ )
-  def buyCoffee2(account: Account): (Coffee, Charge) = ???
 
+  final case class Charge(account: Account, amount: Double)
+  def buyCoffee2(account: Account): (Coffee, Charge) = {
+    val coffee = Coffee()
+    (coffee, Charge(account, coffee.price))
+  }
+
+  /**
+    * ### Scalazzi
+    * 1. Functions        (only use functions, if it's not a function, don't use it)
+    * 2. No poly methods  (don't use methods from AnyRef / Java "Object" etc, don't use methods on polymorphic objects)
+    * 3. No null          (never use null)
+    * 4. No RTTI          (no Runtime Type information/identification, TypeTags etc...)
+    */
   //
   // EXERCISE 8
   //
   // Implement the following function under the Scalazzi subset of Scala.
   //
-  def printLine(line: String): Unit = ???
+  def printLine(line: String): Unit = ()
 
   //
   // EXERCISE 9
   //
   // Implement the following function under the Scalazzi subset of Scala.
   //
-  def readLine: String = ???
+  val readLine: String = "any string"
 
   //
   // EXERCISE 10
   //
   // Implement the following function under the Scalazzi subset of Scala.
   //
-  def systemExit(code: Int): Unit = ???
+  def systemExit(code: Int): Unit = ()
 
   //
   // EXERCISE 11
@@ -283,7 +304,12 @@ object functions {
     println("To exit the help page, type `exit`.")
   }
   def printer2[A](println: String => A, combine: (A, A) => A): A =
-    ???
+    List(
+      "Welcome to the help page!",
+      "To list commands, type `commands`.",
+      "For help on a command, type `help <command>`",
+      "To exit the help page, type `exit`."
+    ).map(println).reduce(combine)
 
   //
   // EXERCISE 12
@@ -299,38 +325,76 @@ object functions {
     def draw(): Unit
     def finish(): List[List[Boolean]]
   }
-  def draw1(size: Int): Draw = new Draw {
-    val canvas = Array.fill(size, size)(false)
-    var x      = 0
-    var y      = 0
+  def draw1(size: Int): Draw =
+    new Draw {
+      val canvas: Array[Array[Boolean]] = Array.fill(size, size)(false)
+      var x                             = 0
+      var y                             = 0
 
-    def goLeft(): Unit  = x -= 1
-    def goRight(): Unit = x += 1
-    def goUp(): Unit    = y += 1
-    def goDown(): Unit  = y -= 1
-    def draw(): Unit = {
-      def wrap(x: Int): Int =
-        if (x < 0) (size - 1) + ((x + 1) % size) else x % size
+      def goLeft(): Unit  = x -= 1
+      def goRight(): Unit = x += 1
+      def goUp(): Unit    = y += 1
+      def goDown(): Unit  = y -= 1
+      def draw(): Unit = {
+        def wrap(x: Int): Int = if (x < 0) (size - 1) + ((x + 1) % size) else x % size
 
-      val x2 = wrap(x)
-      val y2 = wrap(y)
+        val x2 = wrap(x)
+        val y2 = wrap(y)
 
-      canvas.updated(x2, canvas(x2).updated(y2, true))
+        canvas.updated(x2, canvas(x2).updated(y2, true))
+      }
+      def finish(): List[List[Boolean]] = canvas.map(_.toList).toList
     }
-    def finish(): List[List[Boolean]] =
-      canvas.map(_.toList).toList
-  }
-  def draw2(size: Int /* ??? */ ): ??? = ???
+
+  /** Initial JDG impl
+    *
+    * type Bitmap    = List[List[Boolean]]
+    * type Cursor    = (Int, Int)
+    * type Operation = (Cursor, Bitmap) => (Cursor, Bitmap)
+    *
+    * val draw: Operation    = (c, b) => (c, ???)
+    * val goRight: Operation = (c, b) => ((c._1 + 1, c._2), b)
+    * val goLeft: Operation  = (c, b) => ((c._1 - 1, c._2), b)
+    * val goUp: Operation    = (c, b) => ((c._1, c._2 + 1), b)
+    * val goDown: Operation  = (c, b) => ((c._1, c._2 - 1), b)
+    *
+    * goLeft.andThen(goRight).andThen(draw)
+    *
+    * def draw2(size: Int, op: Operation): Bitmap = op((0, 0), List.fill(size, size)(false))
+    */
+  // TODO: impl this.
+  type Bitmap = List[List[Boolean]]
+  type Cursor = (Int, Int)
+
+  sealed trait Operation
+  case object GoLeft  extends Operation
+  case object GoRight extends Operation
+  case object GoUp    extends Operation
+  case object GoDown  extends Operation
+  case object Draw    extends Operation
+
+  /*
+  def draw2(size: Int, op: List[Operation]): Bitmap =
+    op.foldLeft(List.fill(size, size)(false)) {
+      case (bitmapAcc, operation) =>
+        operation match {
+          case Draw    => bitmapAcc
+          case GoLeft  => bitmapAcc()
+          case GoRight => ???
+          case GoUp    => ???
+          case GoDown  => ???
+        }
+
+    }
+
+ */
 }
 
 object higher_order {
   case class Parser[+E, +A](run: String => Either[E, (String, A)])
 
-  def fail[E](e: E): Parser[E, Nothing] =
-    Parser(_ => Left(e))
-
-  def point[A](a: => A): Parser[Nothing, A] =
-    Parser(input => Right((input, a)))
+  def fail[E](e: E): Parser[E, Nothing]     = Parser(_ => Left(e))
+  def point[A](a: => A): Parser[Nothing, A] = Parser(input => Right((input, a)))
 
   def char[E](e: E): Parser[E, Char] =
     Parser(
@@ -346,43 +410,59 @@ object higher_order {
   //
   // Implement the following higher-order function.
   //
-  def alt[E1, E2, A, B](l: Parser[E1, A], r: Parser[E2, B]): Parser[E2, Either[A, B]] = ???
+  def alt[E1, E2, A, B](l: Parser[E1, A], r: Parser[E2, B]): Parser[E2, Either[A, B]] =
+    Parser(
+      input =>
+        l.run(input) match {
+          case Right((string, a)) => Right(string -> Left(a))
+          case Left(_) =>
+            r.run(input) match {
+              case Left(e2)           => Left(e2)
+              case Right((string, b)) => Right(string -> Right(b))
+            }
+        }
+    )
 
   //
   // EXERCISE 2
   //
   // Implement the following higher-order function.
   //
-  def join[A, B, C](f: A => B, g: A => C): A => (B, C) = ???
+  def join[A, B, C](f: A => B, g: A => C): A => (B, C) = a => f(a) -> g(a)
 
   //
   // EXERCISE 3
   //
   // Implement the following higher-order function.
   //
-  def parallel[A, B, C, D](f: A => B, g: C => D): (A, C) => (B, D) = ???
+  def parallel[A, B, C, D](f: A => B, g: C => D): (A, C) => (B, D) = (a, c) => f(a) -> g(c)
 
   //
   // EXERCISE 4
   //
   // Implement the following higher-order function.
   //
-  def leftChoice[A, B, C](f: A => B, g: C => B): Either[A, C] => B = ???
+  def leftChoice[A, B, C](f: A => B, g: C => B): Either[A, C] => B = {
+    case Right(c) => g(c)
+    case Left(a)  => f(a)
+  }
 
   //
   // EXERCISE 5
   //
   // Implement the following higher-order function.
   //
-  def choice[A, B, C, D](f: A => B, g: C => D): Either[A, C] => Either[B, D] =
-    ???
+  def choice[A, B, C, D](f: A => B, g: C => D): Either[A, C] => Either[B, D] = {
+    case Right(c) => Right(g(c))
+    case Left(a)  => Left(f(a))
+  }
 
   //
   // EXERCISE 6
   //
   // Implement the following higer-order function.
   //
-  def compose[A, B, C](f: B => C, g: A => B): A => C = ???
+  def compose[A, B, C](f: B => C, g: A => B): A => C = a => f(g(a))
 }
 
 object poly_functions {
@@ -393,7 +473,7 @@ object poly_functions {
   // element out of any `(A, B)`.
   //
   object snd {
-    ???
+    def apply[A, B](a: A, b: B): B = b
   }
   // snd(1, "foo") // "foo"
 
@@ -405,7 +485,8 @@ object poly_functions {
   // `A` the specified number of times.
   //
   object repeat {
-    ???
+    @tailrec
+    def apply[A](time: Int)(a: A, f: A => A): A = if (time == 0) a else repeat(time - 1)(f(a), f)
   }
   // repeat[Int](100)(0, _ + 1) // 100
   // repeat[String](10)("", _ + "*") // "**********"
@@ -415,7 +496,8 @@ object poly_functions {
   //
   // Count the number of unique implementations of the following method.
   //
-  def countExample1[A, B](a: A, b: B): Either[A, B] = ???
+  def countExample1[A, B](a: A, b: B): Either[A, B] = Left(a)
+  def countExample2[A, B](a: A, b: B): Either[A, B] = Right(b)
   val countExample1Answer                           = ???
 
   //
@@ -423,7 +505,8 @@ object poly_functions {
   //
   // Count the number of unique implementations of the following method.
   //
-  def countExample2[A, B](f: A => B, g: A => B, a: A): B = ???
+  def countExample2[A, B](f: A => B, g: A => B, a: A): B = f(a)
+  def countExample3[A, B](f: A => B, g: A => B, a: A): B = g(a)
   val countExample2Answer                                = ???
 
   //
@@ -431,7 +514,7 @@ object poly_functions {
   //
   // Implement the function `groupBy`.
   //
-  val Data =
+  val Data: List[String] =
     "poweroutage;2018-09-20;level=20" :: Nil
   val By: String => String =
     (data: String) => data.split(";")(1)
@@ -446,7 +529,7 @@ object poly_functions {
         "On date 2018-09-20, there were 1 power outages"
     )
   def groupBy1(l: List[String], by: String => String)(reducer: (String, List[String]) => String): Map[String, String] =
-    ???
+    l.groupBy(by).map { case (date, events) => date -> reducer(date, events) }
   // groupBy1(Data, By)(Reducer) == Expected
 
   //
@@ -456,8 +539,11 @@ object poly_functions {
   // the polymorphic function. Compare to the original.
   //
   object groupBy2 {
-    ???
+    def apply[A, B, C](l: List[A], by: A => B)(reducer: (B, List[A]) => C): Map[B, C] =
+      l.groupBy(by).map { case (date, events) => date -> reducer(date, events) }
   }
+
+  // TODO: Rewrite it with Scalaz groupBy.
 }
 
 object higher_kinded {
@@ -470,13 +556,22 @@ object higher_kinded {
   trait `[*, *] => *`[F[_, _]]
   trait `(* => *) => *`[T[_[_]]]
 
+  /**
+    * Int   : *
+    * List  : * => *
+    * Map   : [*, *] => *
+    * Tuple3: [*, *, *] => *
+    *
+    * def foo[A[_[_, _[_], _], _]: A[_, Int] // [[*, * => *, *] => *, *] => *
+    *
+    */
   //
   // EXERCISE 1
   //
   // Identify a type constructor that takes one type parameter (i.e. has kind
   // `* => *`), and place your answer inside the square brackets.
   //
-  type Answer1 = `* => *`[???]
+  type Answer1 = `* => *`[List]
 
   //
   // EXERCISE 2
@@ -484,15 +579,15 @@ object higher_kinded {
   // Identify a type constructor that takes two type parameters (i.e. has kind
   // `[*, *] => *`), and place your answer inside the square brackets.
   //
-  type Answer2 = `[*, *] => *`[????]
+  type Answer2 = `[*, *] => *`[Map]
 
   //
   // EXERCISE 3
   //
   // Create a new type that has kind `(* -> *) -> *`.
   //
-  type NewType1 /* ??? */
-  type Answer3 = `(* => *) => *`[?????]
+  type NewType1[F[_]]
+  type Answer3 = `(* => *) => *`[NewType1]
 
   //
   // EXERCISE 4
@@ -506,15 +601,16 @@ object higher_kinded {
   //
   // Create a trait with kind `[*, *, *] => *`.
   //
-  trait Answer5 /*[]*/
+  trait Answer5[A, B, C] /*[]*/
 
   //
   // EXERCISE 6
   //
   // Create a trait with kind `[* => *, (* => *) => *] => *`.
   //
-  trait Answer6 /*[]*/
+  trait Answer6[F[_], G[_[_]]] /*[]*/
 
+  // TODO !
   //
   // EXERCISE 7
   //
@@ -562,7 +658,10 @@ object higher_kinded {
     // This method will return the number of `A`s inside `fa`.
     def size[A](fa: F[A]): Int
   }
-  val ListSized: Sized[List] = ???
+  val ListSized: Sized[List] =
+    new Sized[List] {
+      override def size[A](fa: List[A]): Int = fa.length
+    }
 
   //
   // EXERCISE 9
@@ -570,7 +669,10 @@ object higher_kinded {
   // Implement `Sized` for `Map`, partially applied with its first type
   // parameter to `String`.
   //
-  val MapSized1: Sized[Map[String, ?]] = ???
+  val MapSized1: Sized[Map[String, ?]] =
+    new Sized[Map[String, ?]] {
+      override def size[A](fa: Map[String, A]): Int = fa.size
+    }
 
   //
   // EXERCISE 9
@@ -578,21 +680,38 @@ object higher_kinded {
   // Implement `Sized` for `Map`, partially applied with its first type
   // parameter to a user-defined type parameter.
   //
-  def MapSized2[K]: Sized[Map[K, ?]] = ???
+  def MapSized2[K]: Sized[Map[K, ?]] =
+    new Sized[Map[K, ?]] {
+      override def size[A](fa: Map[K, A]): Int = fa.size
+    }
 
   //
   // EXERCISE 10
   //
   // Implement `Sized` for `Tuple3`.
   //
-  def Tuple3Sized: ?? = ???
+  def Tuple3Sized[A, B]: Sized[(A, B, ?)] =
+    new Sized[(A, B, ?)] {
+      override def size[C](fa: (A, B, C)): Int = 1
+    }
 }
 
 object typeclasses {
 
   /**
+    * if we have a1: A, a2: A, a3: A
+    * then
+    * - lt(a1, a2) && lt(a2, a3) == lt(a1, a3)
+    * - lt(a1, a1) == false
+    *
+    * This is called laws !
+    *
+    */
+  // -
+
+  /**
     * {{
-    * Refkexivity:   a ==> equals(a, a)
+    * Reflexivity:   a ==> equals(a, a)
     *
     * Transitivity:  equals(a, b) && equals(b, c) ==>
     *                equals(a, c)
@@ -613,17 +732,15 @@ object typeclasses {
       new Eq[List[A]] {
         def equals(l: List[A], r: List[A]): Boolean =
           (l, r) match {
-            case (Nil, Nil) => true
-            case (Nil, _)   => false
-            case (_, Nil)   => false
-            case (l :: ls, r :: rs) =>
-              (l === r) && equals(ls, rs)
+            case (Nil, Nil)         => true
+            case (Nil, _)           => false
+            case (_, Nil)           => false
+            case (l :: ls, r :: rs) => (l === r) && equals(ls, rs)
           }
       }
   }
   implicit class EqSyntax[A](val l: A) extends AnyVal {
-    def ===(r: A)(implicit eq: Eq[A]): Boolean =
-      eq.equals(l, r)
+    def ===(r: A)(implicit eq: Eq[A]): Boolean = eq.equals(l, r)
   }
 
   //
@@ -633,6 +750,17 @@ object typeclasses {
   case object EQUAL extends Ordering
   case object LT    extends Ordering
   case object GT    extends Ordering
+  object Ordering {
+    implicit val orderingEq: Eq[Ordering] = new Eq[Ordering] {
+      override def equals(l: Ordering, r: Ordering): Boolean =
+        (l, r) match {
+          case (EQUAL, EQUAL) => true
+          case (LT, LT)       => true
+          case (GT, GT)       => true
+          case _              => false
+        }
+    }
+  }
 
   trait Ord[A] {
     def compare(l: A, r: A): Ordering
@@ -672,8 +800,22 @@ object typeclasses {
   // type constructor, and which uses the `Ord` type class, including the
   // compare syntax operator `=?=` to compare elements.
   //
-  def sort1(l: List[Int]): List[Int]     = ???
-  def sort2[A: Ord](l: List[A]): List[A] = ???
+  def sort1(l: List[Int]): List[Int] =
+    l match {
+      case Nil => Nil
+      case x :: xs =>
+        val (lessThan, notLessThan) = xs.partition(_ < x)
+
+        sort1(lessThan) ++ List(x) ++ sort1(notLessThan)
+    }
+
+  def sort2[A: Ord](l: List[A]): List[A] = l match {
+    case Nil => Nil
+    case x :: xs =>
+      val (lessThan, notLessThan) = xs.partition((a: A) => (a =?= x) === LT) // Could be improved if we add more methods in the Ord typeclass methods, like `def <` for example.
+
+      sort2(lessThan) ++ List(x) ++ sort2(notLessThan)
+  }
 
   //
   // Scalaz 8 Encoding
