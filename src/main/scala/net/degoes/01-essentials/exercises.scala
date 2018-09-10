@@ -2,6 +2,8 @@
 
 package net.degoes.essentials
 
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Date
 
 import scala.annotation.tailrec
@@ -857,8 +859,7 @@ object typeclasses {
         def append(l: => List[A], r: => List[A]): List[A] = l ++ r
       })
   }
-  implicit def AnyToSemigroupSyntax[A](a: => A): SemigroupSyntax[A] =
-    new SemigroupSyntax(() => a)
+  implicit def AnyToSemigroupSyntax[A](a: => A): SemigroupSyntax[A] = new SemigroupSyntax(() => a)
   class SemigroupSyntax[A](l: () => A) {
     def <>(r: => A)(implicit A: Semigroup[A]): A = A.append(l(), r)
   }
@@ -867,21 +868,30 @@ object typeclasses {
   //
   // Create an instance of the `Semigroup` type class for `java.time.Instant`.
   //
-  implicit val SemigroupInstant: Semigroup[java.time.Instant] = ???
+  implicit val SemigroupInstant: Semigroup[java.time.Instant] =
+    instanceOf(new SemigroupClass[java.time.Instant] {
+      override def append(l: => Instant, r: => Instant): Instant = l.plus(r.toEpochMilli, ChronoUnit.MILLIS)
+    })
 
   //
   // EXERCISE 3
   //
   // Create an instance of the `Semigroup` type class for `Int`.
   //
-  implicit val SemigroupInt: Semigroup[Int] = ???
+  implicit val SemigroupInt: Semigroup[Int] =
+    instanceOf(new SemigroupClass[Int] {
+      override def append(l: => Int, r: => Int): Int = l + r
+    })
 
   //
   // EXERCISE 4
   //
   // Create an instance of the `Semigroup` type class for `Set[A]`.
   //
-  implicit def SemigroupSet[A]: Semigroup[Set[A]] = ???
+  implicit def SemigroupSet[A]: Semigroup[Set[A]] =
+    instanceOf(new SemigroupClass[Set[A]] {
+      override def append(l: => Set[A], r: => Set[A]): Set[A] = l ++ r
+    })
 
   //
   // EXERCISE 5
@@ -889,8 +899,10 @@ object typeclasses {
   // Create an instance of the `Semigroup` type class for `Map[K, ?]`. Hint:
   // you will need some constraint applied to the values.
   //
-  implicit def SemigroupMap[K, V: ???]: Semigroup[Map[K, V]] =
-    ???
+  implicit def SemigroupMap[K, V: Semigroup]: Semigroup[Map[K, V]] =
+    instanceOf(new SemigroupClass[Map[K, V]] {
+      override def append(l: => Map[K, V], r: => Map[K, V]): Map[K, V] = l ++ r
+    })
 
   //
   // EXERCISE 6
@@ -906,43 +918,59 @@ object typeclasses {
     * }}
     */
   trait MonoidClass[A] extends SemigroupClass[A] {
-    /* ??? */
+    def zero: A
   }
   object MonoidClass {
-    def apply[A](implicit A: Monoid[A]): Monoid[A] = ???
+    def apply[A](implicit A: Monoid[A]): Monoid[A] = A
   }
   type Monoid[A] = InstanceOf[MonoidClass[A]]
-  implicit def MonoidSemigroup[A](implicit M: Monoid[A]): Semigroup[A] =
-    instanceOf(M)
-  def empty[A: Monoid]: A = ???
+  implicit def MonoidSemigroup[A](implicit M: Monoid[A]): Semigroup[A] = instanceOf(M)
+
+  def empty[A: Monoid]: A = implicitly[Monoid[A]].zero
 
   //
   // EXERCISE 7
   //
   // Create an instance of the `Monoid` type class for `java.time.Instant`.
   //
-  implicit val MonoidInstant: Monoid[java.time.Instant] = ???
+  implicit val MonoidInstant: Monoid[java.time.Instant] =
+    instanceOf(new MonoidClass[java.time.Instant] {
+      override def zero: Instant                                 = Instant.MIN
+      override def append(l: => Instant, r: => Instant): Instant = implicitly[Semigroup[java.time.Instant]].append(l, r)
+    })
 
   //
   // EXERCISE 8
   //
   // Create an instance of the `Monoid` type class for `String`.
   //
-  implicit val MonoidString: Monoid[String] = ???
+  implicit val MonoidString: Monoid[String] =
+    instanceOf(new MonoidClass[String] {
+      override def zero: String                               = ""
+      override def append(l: => String, r: => String): String = implicitly[Semigroup[String]].append(l, r)
+    })
 
   //
   // EXERCISE 9
   //
   // Create an instance of the `Monoid` type class for `List[A]`.
   //
-  implicit def MonoidList[A]: Monoid[List[A]] = ???
+  implicit def MonoidList[A]: Monoid[List[A]] =
+    instanceOf(new MonoidClass[List[A]] {
+      override def zero: List[A]                                 = Nil
+      override def append(l: => List[A], r: => List[A]): List[A] = implicitly[Semigroup[List[A]]].append(l, r)
+    })
 
   //
   // EXERCISE 10
   //
   // Create an instance of the `Monoid` type class for `Int`.
   //
-  implicit val MonoidInt: Monoid[Int] = ???
+  implicit val MonoidInt: Monoid[Int] =
+    instanceOf(new MonoidClass[Int] {
+      override def zero: Int                         = 0
+      override def append(l: => Int, r: => Int): Int = implicitly[Semigroup[Int]].append(l, r)
+    })
 
   //
   // EXERCISE 11
@@ -951,8 +979,12 @@ object typeclasses {
   // representing the additive monoid, with addition as `append`, and 0 as
   // `zero`.
   //
-  final case class Sum(run: Int)
-  implicit val MonoidSum: Monoid[Sum] = ???
+  final case class Sum(run: Int) extends AnyVal
+  implicit val MonoidSum: Monoid[Sum] =
+    instanceOf(new MonoidClass[Sum] {
+      override def zero: Sum                         = Sum(0)
+      override def append(l: => Sum, r: => Sum): Sum = Sum(l.run + r.run)
+    })
 
   //
   // EXERCISE 12
@@ -961,8 +993,12 @@ object typeclasses {
   // representing the multiplicative monoid, with multiplication as `append`,
   // and 1 as `zero`.
   //
-  final case class Product(run: Int)
-  implicit val MonoidProduct: Monoid[Product] = ???
+  final case class Product(run: Int) extends AnyVal
+  implicit val MonoidProduct: Monoid[Product] =
+    instanceOf(new MonoidClass[Product] {
+      override def zero: Product                                 = Product(1)
+      override def append(l: => Product, r: => Product): Product = Product(l.run * r.run)
+    })
 
   //
   // EXERCISE 13
@@ -978,5 +1014,13 @@ object typeclasses {
     def apply[F[_]](implicit F: Collection[F]): Collection[F] = F
   }
   type Collection[F[_]] = InstanceOf[CollectionClass[F]]
-  implicit val ListCollection: Collection[List] = ???
+  implicit val ListCollection: Collection[List] = instanceOf(new CollectionClass[List] {
+    override def empty[A]: List[A]                   = Nil
+    override def cons[A](a: A, as: List[A]): List[A] = a +: as
+    override def uncons[A](fa: List[A]): Option[(A, List[A])] =
+      fa match {
+        case Nil     => None
+        case x :: xs => Some(x -> xs)
+      }
+  })
 }
