@@ -2,6 +2,4 @@
 
 package net.degoes.applications
 
-object exercises {
-
-}
+object exercises {}
