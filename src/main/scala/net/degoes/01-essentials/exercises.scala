@@ -381,20 +381,8 @@ object functions {
   def draw2(size: Int, op: List[Operation]): Bitmap = {
     def wrap(x: Int): Int = if (x < 0) (size - 1) + ((x + 1) % size) else x % size
 
-    def newStep(
-        bitmapAcc: ArrayBuffer[ArrayBuffer[Boolean]],
-        newX: Int,
-        newY: Int
-    ): (ArrayBuffer[ArrayBuffer[Boolean]], (Int, Int)) = {
-      val safeNewX = wrap(newX)
-      val safeNewY = wrap(newY)
-
-      bitmapAcc(safeNewX)(safeNewY) = true
-      (bitmapAcc, (safeNewX, safeNewY))
-    }
-
-    op.foldLeft((mutable.ArrayBuffer.fill[Boolean](size, size)(false), (0, 0))) {
-        case ((bitmapAcc: ArrayBuffer[ArrayBuffer[Boolean]], (x, y)), operation) =>
+    op.foldLeft((Array.fill[Boolean](size, size)(false), (0, 0))) {
+        case ((bitmapAcc: Array[Array[Boolean]], (x, y)), operation) =>
           operation match {
             case GoLeft  => (bitmapAcc, (x + 1, y))
             case GoRight => (bitmapAcc, (x - 1, y))
