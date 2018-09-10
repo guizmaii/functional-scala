@@ -368,7 +368,6 @@ object functions {
     * def draw2(size: Int, op: Operation): Bitmap = op((0, 0), List.fill(size, size)(false))
     */
   type Bitmap = List[List[Boolean]]
-  type Cursor = (Int, Int)
 
   sealed trait Operation
   case object GoLeft  extends Operation
@@ -382,7 +381,7 @@ object functions {
     def wrap(x: Int): Int = if (x < 0) (size - 1) + ((x + 1) % size) else x % size
 
     op.foldLeft((Array.fill[Boolean](size, size)(false), (0, 0))) {
-        case ((bitmapAcc: Array[Array[Boolean]], (x, y)), operation) =>
+        case ((bitmapAcc, (x, y)), operation) =>
           operation match {
             case GoLeft  => (bitmapAcc, (x + 1, y))
             case GoRight => (bitmapAcc, (x - 1, y))
