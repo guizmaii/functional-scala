@@ -1,5 +1,7 @@
 import sbt._
 
+scalafmtOnCompile := true
+
 lazy val functionalScala = (project in file(".")).
   settings (
     name          := "Functional Scala",
