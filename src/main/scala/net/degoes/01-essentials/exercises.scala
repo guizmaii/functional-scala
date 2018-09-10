@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit
 import java.util.Date
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -377,21 +378,36 @@ object functions {
   case object GoDown  extends Operation
   case object Draw    extends Operation
 
-  /*
-  def draw2(size: Int, op: List[Operation]): Bitmap =
-    op.foldLeft(List.fill(size, size)(false)) {
-      case (bitmapAcc, operation) =>
-        operation match {
-          case Draw    => bitmapAcc
-          case GoLeft  => bitmapAcc()
-          case GoRight => ???
-          case GoUp    => ???
-          case GoDown  => ???
-        }
+  def draw2(size: Int, op: List[Operation]): Bitmap = {
+    def wrap(x: Int): Int = if (x < 0) (size - 1) + ((x + 1) % size) else x % size
 
+    def newStep(
+        bitmapAcc: ArrayBuffer[ArrayBuffer[Boolean]],
+        newX: Int,
+        newY: Int
+    ): (ArrayBuffer[ArrayBuffer[Boolean]], (Int, Int)) = {
+      val safeNewX = wrap(newX)
+      val safeNewY = wrap(newY)
+
+      bitmapAcc(safeNewX)(safeNewY) = true
+      (bitmapAcc, (safeNewX, safeNewY))
     }
 
- */
+    op.foldLeft((mutable.ArrayBuffer.fill[Boolean](size, size)(false), (0, 0))) {
+        case ((bitmapAcc: ArrayBuffer[ArrayBuffer[Boolean]], (x, y)), operation) =>
+          operation match {
+            case Draw    => (bitmapAcc, (x, y))
+            case GoLeft  => newStep(bitmapAcc, x + 1, y)
+            case GoRight => newStep(bitmapAcc, x - 1, y)
+            case GoUp    => newStep(bitmapAcc, x, y + 1)
+            case GoDown  => newStep(bitmapAcc, x, y - 1)
+          }
+      }
+      ._1
+      .toList
+      .map(_.toList)
+  }
+
 }
 
 object higher_order {
@@ -454,7 +470,7 @@ object higher_order {
   //
   // EXERCISE 5
   //
-  // Implement the following higer-order function.
+  // Implement the following higher-order function.
   //
   def choice[A, B, C, D](f: A => B, g: C => D): Either[A, C] => Either[B, D] = {
     case Right(c) => Right(g(c))
@@ -733,7 +749,7 @@ object typeclasses {
     implicit val EqInt: Eq[Int] = new Eq[Int] {
       def equals(l: Int, r: Int): Boolean = l == r
     }
-    implicit def EqList[A: Eq]: Eq[List[A]] =
+    implicit def EqList[A](implicit Eq: Eq[A]): Eq[List[A]] =
       new Eq[List[A]] {
         @tailrec
         def equals(l: List[A], r: List[A]): Boolean =
@@ -741,7 +757,7 @@ object typeclasses {
             case (Nil, Nil)         => true
             case (Nil, _)           => false
             case (_, Nil)           => false
-            case (l :: ls, r :: rs) => (l === r) && equals(ls, rs)
+            case (l :: ls, r :: rs) => Eq.equals(l, r) && equals(ls, rs)
           }
       }
   }
