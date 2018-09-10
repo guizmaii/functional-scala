@@ -367,7 +367,6 @@ object functions {
     *
     * def draw2(size: Int, op: Operation): Bitmap = op((0, 0), List.fill(size, size)(false))
     */
-  // TODO: impl this.
   type Bitmap = List[List[Boolean]]
   type Cursor = (Int, Int)
 
@@ -378,6 +377,7 @@ object functions {
   case object GoDown  extends Operation
   case object Draw    extends Operation
 
+  // TODO: Is this correct ?
   def draw2(size: Int, op: List[Operation]): Bitmap = {
     def wrap(x: Int): Int = if (x < 0) (size - 1) + ((x + 1) % size) else x % size
 
