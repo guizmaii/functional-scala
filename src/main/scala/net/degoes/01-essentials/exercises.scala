@@ -409,8 +409,8 @@ object functions {
           }
       }
       ._1
-      .toList
       .map(_.toList)
+      .toList
   }
 
 }
