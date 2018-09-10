@@ -54,15 +54,16 @@ object types {
   final case class Person2(age: Int, name: String)
 
   //
-  // EXERCISE 5 BIS
+  // EXERCISE 6
   //
-  // Prove that `1 * A` is equivalent to `A` by implementing the functions
+  // Prove that `A * 1` is equivalent to `A` by implementing the following two
+  // functions.
   //
-  def to1[A](t: (A, Unit)): A  = t._1
-  def from[A](a: A): (A, Unit) = (a, ())
+  def to1[A](t: (A, Unit)): A   = t._1
+  def from1[A](a: A): (A, Unit) = (a, ())
 
   //
-  // EXERCISE 6
+  // EXERCISE 7
   //
   // Create a sum type of `Int` and `String` representing the identifier of
   // a robot (a number) or a person (a name).
@@ -74,15 +75,16 @@ object types {
   final case class PersonId(name: String) extends Identifier2
 
   //
-  // EXERCISE 6 BIS
+  // EXERCISE 8
   //
-  // Prove that `A + Nothing` is equivalent to `A`by implementing the functions
+  // Prove that `A + 0` is equivalent to `A` by implementing the following two
+  // functions.
   //
   def to2[A](t: Either[A, Nothing]): A   = t.left.get
   def from2[A](a: A): Either[A, Nothing] = Left(a)
 
   //
-  // EXERCISE 7
+  // EXERCISE 9
   //
   // Create either a sum type or a product type (as appropriate) to represent a
   // credit card, which has a number, an expiration date, and a security code.
@@ -90,7 +92,7 @@ object types {
   type CreditCard = (Int, Date, String)
 
   //
-  // EXERCISE 8
+  // EXERCISE 10
   //
   // Create either a sum type or a product type (as appropriate) to represent a
   // payment method, which could be a credit card, bank account, or
@@ -102,7 +104,7 @@ object types {
   case object Cryptocurrency extends PaymentMethod
 
   //
-  // EXERCISE 8
+  // EXERCISE 11
   //
   // Create either a sum type or a product type (as appropriate) to represent an
   // employee at a company, which has a title, salary, name, employment date.
@@ -110,7 +112,7 @@ object types {
   type Employee = (String, Int, String, Date)
 
   //
-  // EXERCISE 9
+  // EXERCISE 12
   //
   // Create either a sum type or a product type (as appropriate) to represent a
   // piece on a chess board, which could be a pawn, rook, bishop, knight,
@@ -125,7 +127,7 @@ object types {
   case object King   extends ChessPiece
 
   //
-  // EXERCISE 10
+  // EXERCISE 13
   //
   // Create an ADT model of a game world, including a map, a player, non-player
   // characters, different classes of items, and character stats.
@@ -181,7 +183,7 @@ object functions {
   //
   // EXERCISE 1
   //
-  // Convert the following partial function into a total function.
+  // Convert the following non-function into a function.
   //
   def parseInt1(s: String): Int         = s.toInt               // impure. Lying function.
   def parseInt2(s: String): Option[Int] = Try(s.toInt).toOption // Pure
@@ -430,21 +432,21 @@ object higher_order {
   //
   // Implement the following higher-order function.
   //
-  def join[A, B, C](f: A => B, g: A => C): A => (B, C) = a => f(a) -> g(a)
+  def fanout[A, B, C](f: A => B, g: A => C): A => (B, C) = a => f(a) -> g(a)
 
   //
   // EXERCISE 3
   //
   // Implement the following higher-order function.
   //
-  def parallel[A, B, C, D](f: A => B, g: C => D): (A, C) => (B, D) = (a, c) => f(a) -> g(c)
+  def cross[A, B, C, D](f: A => B, g: C => D): (A, C) => (B, D) = (a, c) => f(a) -> g(c)
 
   //
   // EXERCISE 4
   //
   // Implement the following higher-order function.
   //
-  def leftChoice[A, B, C](f: A => B, g: C => B): Either[A, C] => B = {
+  def either[A, B, C](f: A => B, g: C => B): Either[A, C] => B = {
     case Right(c) => g(c)
     case Left(a)  => f(a)
   }
@@ -452,7 +454,7 @@ object higher_order {
   //
   // EXERCISE 5
   //
-  // Implement the following higher-order function.
+  // Implement the following higer-order function.
   //
   def choice[A, B, C, D](f: A => B, g: C => D): Either[A, C] => Either[B, D] = {
     case Right(c) => Right(g(c))
@@ -462,17 +464,18 @@ object higher_order {
   //
   // EXERCISE 6
   //
-  // Implement the following higer-order function.
+  // Implement the following higher-order function.
   //
   def compose[A, B, C](f: B => C, g: A => B): A => C = a => f(g(a))
+
 }
 
 object poly_functions {
   //
   // EXERCISE 1
   //
-  // Create a polymorphic function called `snd` that returns the second
-  // element out of any `(A, B)`.
+  // Create a polymorphic function of two type parameters `A` and `B` called
+  // `snd` that returns the second element out of any pair of `A` and `B`.
   //
   object snd {
     def apply[A, B](a: A, b: B): B = b
@@ -732,6 +735,7 @@ object typeclasses {
     }
     implicit def EqList[A: Eq]: Eq[List[A]] =
       new Eq[List[A]] {
+        @tailrec
         def equals(l: List[A], r: List[A]): Boolean =
           (l, r) match {
             case (Nil, Nil)         => true
@@ -778,6 +782,24 @@ object typeclasses {
   implicit class OrdSyntax[A](l: A) {
     def =?=(r: A)(implicit A: Ord[A]): Ordering =
       A.compare(l, r)
+
+    def <(r: A)(implicit A: Ord[A]): Boolean =
+      Eq[Ordering].equals(A.compare(l, r), LT)
+
+    def <=(r: A)(implicit A: Ord[A]): Boolean =
+      (l < r) || (this === r)
+
+    def >(r: A)(implicit A: Ord[A]): Boolean =
+      Eq[Ordering].equals(A.compare(l, r), GT)
+
+    def >=(r: A)(implicit A: Ord[A]): Boolean =
+      (l > r) || (this === r)
+
+    def ===(r: A)(implicit A: Ord[A]): Boolean =
+      Eq[Ordering].equals(A.compare(l, r), EQUAL)
+
+    def !==(r: A)(implicit A: Ord[A]): Boolean =
+      !Eq[Ordering].equals(A.compare(l, r), EQUAL)
   }
   case class Person(age: Int, name: String)
   object Person {
@@ -814,7 +836,7 @@ object typeclasses {
   def sort2[A: Ord](l: List[A]): List[A] = l match {
     case Nil => Nil
     case x :: xs =>
-      val (lessThan, notLessThan) = xs.partition((a: A) => (a =?= x) === LT) // Could be improved if we add more methods in the Ord typeclass methods, like `def <` for example.
+      val (lessThan, notLessThan) = xs.partition(_ < x)
 
       sort2(lessThan) ++ List(x) ++ sort2(notLessThan)
   }
