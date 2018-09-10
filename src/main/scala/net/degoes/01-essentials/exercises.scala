@@ -7,7 +7,6 @@ import java.time.temporal.ChronoUnit
 import java.util.Date
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -387,7 +386,7 @@ object functions {
             case GoRight => (bitmapAcc, (x - 1, y))
             case GoUp    => (bitmapAcc, (x, y + 1))
             case GoDown  => (bitmapAcc, (x, y - 1))
-            case Draw    =>
+            case Draw =>
               val newX = wrap(x)
               val newY = wrap(y)
 
