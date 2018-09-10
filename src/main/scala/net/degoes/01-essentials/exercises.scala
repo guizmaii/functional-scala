@@ -396,11 +396,16 @@ object functions {
     op.foldLeft((mutable.ArrayBuffer.fill[Boolean](size, size)(false), (0, 0))) {
         case ((bitmapAcc: ArrayBuffer[ArrayBuffer[Boolean]], (x, y)), operation) =>
           operation match {
-            case Draw    => (bitmapAcc, (x, y))
-            case GoLeft  => newStep(bitmapAcc, x + 1, y)
-            case GoRight => newStep(bitmapAcc, x - 1, y)
-            case GoUp    => newStep(bitmapAcc, x, y + 1)
-            case GoDown  => newStep(bitmapAcc, x, y - 1)
+            case GoLeft  => (bitmapAcc, (x + 1, y))
+            case GoRight => (bitmapAcc, (x - 1, y))
+            case GoUp    => (bitmapAcc, (x, y + 1))
+            case GoDown  => (bitmapAcc, (x, y - 1))
+            case Draw    =>
+              val newX = wrap(x)
+              val newY = wrap(y)
+
+              bitmapAcc(newX)(newY) = true
+              (bitmapAcc, (newX, newY))
           }
       }
       ._1
