@@ -622,7 +622,6 @@ object higher_kinded {
   //
   trait Answer6[F[_], G[_[_]]] /*[]*/
 
-  // TODO !
   //
   // EXERCISE 7
   //
@@ -661,9 +660,13 @@ object higher_kinded {
   }
   val ListCollectionLike: CollectionLike[List] =
     new CollectionLike[List] {
-      override def empty[A]: List[A]                            = Nil
-      override def cons[A](a: A, as: List[A]): List[A]          = a +: as
-      override def uncons[A](as: List[A]): Option[(A, List[A])] = ???
+      override def empty[A]: List[A]                   = Nil
+      override def cons[A](a: A, as: List[A]): List[A] = a +: as
+      override def uncons[A](as: List[A]): Option[(A, List[A])] =
+        as match {
+          case Nil     => None
+          case x :: xs => Some(x -> xs)
+        }
     }
 
   //
