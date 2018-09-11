@@ -13,7 +13,15 @@ object algebra {
   //
   case class NotEmpty[+A](head: A, tail: Option[NotEmpty[A]])
   implicit def NotEmptySemigroup[A]: Semigroup[NotEmpty[A]] =
-    ???
+    new Semigroup[NotEmpty[A]] {
+      // TODO: this is false. Fix it !
+      override def append(f1: NotEmpty[A], f2: => NotEmpty[A]): NotEmpty[A] =
+        (f1, f2) match {
+          case (NotEmpty(a, None), NotEmpty(b, None)) => NotEmpty(a, Some(NotEmpty(b, None)))
+          case (NotEmpty(a, Some(nonEmptyA)), NotEmpty(b, Some(nonEmptyB))) =>
+            NotEmpty(a, None) |+| nonEmptyA |+| NotEmpty(b, None) |+| nonEmptyB
+        }
+    }
   val example1 = NotEmpty(1, None) |+| NotEmpty(2, None)
 
   //
@@ -22,9 +30,19 @@ object algebra {
   // Design a permission system for securing some resource, together with a
   // monoid for the permission data structure.
   //
-  case class Permission( /* ??? */ )
-  implicit val MonoidPermission: Monoid[Permission] = ???
-  val example2                                      = mzero[Permission] |+| Permission()
+  sealed trait Rights
+  case object Read  extends Rights
+  case object Write extends Rights
+
+  final case class Email(value: String) extends AnyVal
+  sealed trait Resource
+  final case class File(name: String)  extends Resource
+  final case class Video(name: String) extends Resource
+
+  case class Permission(ps: Map[Email, (Resource, Set[Rights])]) extends AnyVal
+  implicit val MonoidPermission: Monoid[Permission] = ??? // TODO !
+
+  val example2 = mzero[Permission] |+| Permission(Map((Email("Jules"), (File("FP to the Max"), Set(Read)))))
 
   //
   // EXERCISE 3
@@ -32,14 +50,17 @@ object algebra {
   // Define an instance of `Semigroup` for `(A, B)` when both `A` and
   // `B` form semigroups.
   //
-  implicit def SemigroupTuple2[A: Semigroup, B: Semigroup]: Semigroup[(A, B)] = ???
+  implicit def SemigroupTuple2[A: Semigroup, B: Semigroup]: Semigroup[(A, B)] =
+    new Semigroup[(A, B)] {
+      override def append(l: (A, B), r: => (A, B)): (A, B) = (l._1 |+| r._1, l._2 |+| r._2)
+    }
 
   //
   // EXERCISE 4
   //
   // Try to define an instance of `Monoid` for `NotEmpty` for any type `A`.
   //
-  implicit def MonoidNotEmpty[A]: Monoid[NotEmpty[A]] = ???
+  implicit def MonoidNotEmpty[A]: Monoid[NotEmpty[A]] = ??? // Impossible !
 }
 
 object functor {
