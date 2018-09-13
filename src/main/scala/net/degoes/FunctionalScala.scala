@@ -96,6 +96,42 @@ object FunctionalScala extends App {
     loop(seeds, Set(), mzero[Crawl[E, A]])
   }
 
+  final def parCrawl[E: Monoid, A: Monoid](
+      seeds: Set[URL],
+      router: URL => Set[URL],
+      processor: (URL, HTML) => IO[E, A],
+      schedule: Schedule[Throwable, Unit] = defaultCrawlSchedule
+  ): IO[Throwable, Crawl[E, A]] = {
+    def process1(url: URL, html: HTML): IO[Nothing, Crawl[E, A]] =
+      processor(url, html)
+        .redeemPure(e => Crawl(errors = e, value = mzero[A]), a => Crawl(errors = mzero[E], value = a))
+
+    def loop(seeds: Set[URL], visited: Ref[Set[URL]], crawl0: Ref[Crawl[E, A]]): IO[Throwable, Crawl[E, A]] =
+      IO.parTraverse(seeds) { url =>
+          for {
+            html  <- getContent(url).retry(schedule)
+            crawl <- process1(url, html)
+            links <- visited.get.map(extractURLs(url, html).toSet.flatMap(router) diff _)
+          } yield (crawl, links)
+        }
+        .map(_.foldMap(identity)) // IO[List[(Crawl[E, A], Set[URL])] => (Crawl[E, A], Set[URL])] because Crawl is a Monoid as well as Set. `foldMap` beauty !
+        .flatMap {
+          case (crawl1, links) =>
+            for {
+              _        <- visited.update(_ ++ seeds)
+              _        <- crawl0.update(_ |+| crawl1)
+              newCrawl <- loop(links, visited, crawl0)
+            } yield newCrawl
+        }
+
+    for {
+      visited <- Ref(Set.empty[URL])
+      crawl0  <- Ref(mzero[Crawl[E, A]])
+      crawl   <- loop(seeds, visited, crawl0)
+    } yield crawl
+
+  }
+
   final case class ProcessorError[E](error: E, url: URL, html: HTML)
   final def crawlE[E, A: Monoid](
       seed: Set[URL],
