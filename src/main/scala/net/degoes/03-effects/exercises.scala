@@ -911,6 +911,7 @@ object zio_schedule {
 
   object Teaching0 {
 
+    /*
     object MyRTS extends RTS {}
 
     MyRTS.unsafeRun(putStrLn("H W !"))
@@ -921,6 +922,7 @@ object zio_schedule {
           res => ExitStatus.ExitNow(0)
         )
     }
+   */
 
   }
 
