@@ -2,4 +2,10 @@
 
 package net.degoes.applications
 
-object exercises {}
+object exercises {
+
+  /**
+  * See FunctionalScala && FinalTaglessFunctionalScala
+  */
+
+}
