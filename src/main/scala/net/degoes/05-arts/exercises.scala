@@ -246,46 +246,40 @@ object exercises {
     final case class Let[A, B](name: String, value: Expr[A], body: Expr[B]) extends Expr[B]
     final case class Value[A](name: String)                                 extends Expr[A]
     final case class UpdateVar[A](name: String, value: Expr[A])             extends Expr[A]
-    final case class LessThan[A](left: Expr[Int], right: Expr[Int])         extends Expr[Boolean]
-    final case class While[A](condition: Expr[Boolean], body: Expr[A])      extends Expr[A]
-
-    val program: Expr[Int] =
-      Let('i, IntLit(0), While(LessThan(Value('i), IntLit(10)), UpdateVar('i, Add(Value('i), IntLit(1)))))
+    final case class LessThan(left: Expr[Int], right: Expr[Int])            extends Expr[Boolean]
+    final case class While[A](condition: Expr[Boolean], body: Expr[A])      extends Expr[Unit]
 
     case class IState(value: Map[String, Any]) {
-      def addValue(name: String, value: Any): IState = copy(value = value + (name -> value))
-      def removeValue(name: String): IState          = copy(value = value - name)
+      def addVariable(name: String, v: Any): IState = copy(value = value + (name -> v))
+      def removeVariable(name: String): IState      = copy(value = value - name)
     }
-
-    type MyState[A]   = State[IState, A]
-    type Interpret[A] = EitherT[MyState, String, A]
 
     import scalaz.zio._
 
-    def interpret[A0](p: Expr[A0], ref: Ref[IState]): IO[String, A0] = {
-      def interpret0[A](expr: Expr[A]): IO[String, A] = {
-        p match {
-          case IntLit(value) => IO.now(value)
-          case Add(l, r)     => interpret0(l).seqWith(interpret0(r))(_ + _)
+    def interpret[A0](expr: Expr[A0], ref: Ref[IState]): IO[String, A0] = {
+      def interpret0[A](expr: Expr[A]): IO[String, A] =
+        expr match {
+          case IntLit(value)    => IO.now(value)
+          case Add(left, right) => interpret0(left).seqWith(interpret0(right))(_ + _)
 
           case Let(name, value, body) =>
             for {
               v <- interpret0(value)
-              _ <- ref.update(_.addValue(name, v))
+              _ <- ref.update(_.addVariable(name, v))
               b <- interpret0(body)
-              _ <- ref.update(_.removeValue(name))
-            } yield b.asInstanceOf[A]
+              _ <- ref.update(_.removeVariable(name))
+            } yield b
 
           case Value(name) =>
             for {
               s <- ref.get
-              v <- IO.fromOption(s.value.get(name)).leftMap(_ => s"Unreferenced varialbe $name")
+              v <- IO.fromOption(s.value.get(name)).leftMap(_ => s"Unreferenced variable: $name")
             } yield v.asInstanceOf[A]
 
           case UpdateVar(name, value) =>
             for {
               v <- interpret0(value)
-              _ <- ref.update(_.addValue(name, v))
+              _ <- ref.update(_.addVariable(name, v))
             } yield v
 
           case LessThan(left, right) =>
@@ -297,9 +291,8 @@ object exercises {
               _ <- if (b) interpret0(body) else IO.unit
             } yield b).repeat(Schedule.doWhile[Boolean](identity)).void
         }
-      }
 
-      interpret0(p)
+      interpret0[A0](expr)
     }
 
     /*
