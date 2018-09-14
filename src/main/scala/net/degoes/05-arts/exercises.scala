@@ -289,7 +289,7 @@ object exercises {
             (for {
               b <- interpret0(condition)
               _ <- if (b) interpret0(body) else IO.unit
-            } yield b).repeat(Schedule.doWhile[Boolean](identity)).void
+            } yield b).repeat(Schedule.doWhile[Boolean](identity).void)
         }
 
       interpret0[A0](expr)
