@@ -240,14 +240,14 @@ object exercises {
     /**
       * v1
       */
-    sealed trait Expr[A]
-    final case class IntLit(value: Int)                                     extends Expr[Int]
-    final case class Add(l: Expr[Int], r: Expr[Int])                        extends Expr[Int]
-    final case class Let[A, B](name: String, value: Expr[A], body: Expr[B]) extends Expr[B]
-    final case class Value[A](name: String)                                 extends Expr[A]
-    final case class UpdateVar[A](name: String, value: Expr[A])             extends Expr[A]
-    final case class LessThan(left: Expr[Int], right: Expr[Int])            extends Expr[Boolean]
-    final case class While[A](condition: Expr[Boolean], body: Expr[A])      extends Expr[Unit]
+    sealed trait Expr0[A]
+    final case class IntLit(value: Int)                                       extends Expr0[Int]
+    final case class Add(l: Expr0[Int], r: Expr0[Int])                        extends Expr0[Int]
+    final case class Let[A, B](name: String, value: Expr0[A], body: Expr0[B]) extends Expr0[B]
+    final case class Value[A](name: String)                                   extends Expr0[A]
+    final case class UpdateVar[A](name: String, value: Expr0[A])              extends Expr0[A]
+    final case class LessThan(left: Expr0[Int], right: Expr0[Int])            extends Expr0[Boolean]
+    final case class While[A](condition: Expr0[Boolean], body: Expr0[A])      extends Expr0[Unit]
 
     case class IState(value: Map[String, Any]) {
       def addVariable(name: String, v: Any): IState = copy(value = value + (name -> v))
@@ -256,8 +256,8 @@ object exercises {
 
     import scalaz.zio._
 
-    def interpret[A0](expr: Expr[A0], ref: Ref[IState]): IO[String, A0] = {
-      def interpret0[A](expr: Expr[A]): IO[String, A] =
+    def interpret[A0](expr: Expr0[A0], ref: Ref[IState]): IO[String, A0] = {
+      def interpret0[A](expr: Expr0[A]): IO[String, A] =
         expr match {
           case IntLit(value)    => IO.now(value)
           case Add(left, right) => interpret0(left).seqWith(interpret0(right))(_ + _)
@@ -295,21 +295,70 @@ object exercises {
       interpret0[A0](expr)
     }
 
-    /*
     /**
-   * let i = 0
-   * in while(1 < 10) { i = i + i }
-   */
-    sealed trait Expr[A]
-    final case class IntLit(value: Int)                                     extends Expr[Int]
-    final case class Add(l: Expr[Int], r: Expr[Int])                        extends Expr[Int]
-    final case class Let[A, B](name: Symbol, value: Expr[A], body: Expr[B]) extends Expr[B]
-    final case class Value[A](name: Symbol)                                 extends Expr[A]
-    final case class UpdateVar[A](name: Symbol, value: Expr[A])             extends Expr[A]
-    final case class LessThan[A](left: Expr[Int], right: Expr[Int])         extends Expr[Boolean]
-    final case class While[A](condition: Expr[Boolean], body: Expr[A])      extends Expr[A]
+      * v2
+      */
+    trait Expr[F[_]] {
+      def intLit(value: Int): F[Int]
+      def add(l: F[Int], r: F[Int]): F[Int]
+      def let[A, B](name: String, value: F[A], body: F[A] => F[B]): F[B]
+      def updateVar[A](name: String, value: F[A]): F[A]
+      def lessThan(left: F[Int], right: F[Int]): F[Boolean]
+      def while0[A](condition: F[Boolean], body: F[A]): F[Unit]
+    }
+    object Expr {
+      def apply[F[_]](implicit F: Expr[F]): Expr[F] = F
+    }
+    implicit class IntExprSunctax[F[_]](left: F[Int]) {
+      def +(right: F[Int])(implicit F: Expr[F]): F[Int]     = F.add(left, right)
+      def <(right: F[Int])(implicit F: Expr[F]): F[Boolean] = F.lessThan(left, right)
+    }
+    def int[F[_]: Expr](int: Int): F[Int]                                          = Expr[F].intLit(int)
+    def let[F[_]: Expr, A, B](name: String, value: F[A])(body: F[A] => F[B]): F[B] = Expr[F].let(name, value, body)
+    def while0[F[_]: Expr, A](condition: F[Boolean])(body: F[A]): F[Unit]          = Expr[F].while0(condition, body)
 
-   */
+    def interpreter(ref: Ref[IState]): Expr[IO[String, ?]] =
+      new Expr[IO[String, ?]] {
+        override def intLit(value: Int): IO[String, Int] = IO.now(value)
+
+        override def add(l: IO[String, Int], r: IO[String, Int]): IO[String, Int] =
+          l.seqWith(r)(_ + _)
+
+        override def let[A, B](
+            name: String,
+            value: IO[String, A],
+            body: IO[String, A] => IO[String, B]
+        ): IO[String, B] =
+          for {
+            v <- value
+            _ <- ref.update(_.addVariable(name, v))
+            b <- body(value)
+            _ <- ref.update(_.removeVariable(name))
+          } yield b
+
+        override def updateVar[A](name: String, value: IO[String, A]): IO[String, A] =
+          for {
+            v <- value
+            _ <- ref.update(_.addVariable(name, v))
+          } yield v
+
+        override def lessThan(left: IO[String, Int], right: IO[String, Int]): IO[String, Boolean] =
+          left.seqWith(right)(_ < _)
+
+        override def while0[A](condition: IO[String, Boolean], body: IO[String, A]): IO[String, Unit] =
+          (for {
+            b <- condition
+            _ <- if (b) body else IO.unit
+          } yield b).repeat(Schedule.doWhile[Boolean](identity).void)
+      }
+
+    def program[F[_]: Expr]: F[Unit] =
+      let("i", int(0)) { i =>
+        while0(i < int(10)) {
+          Expr[F].updateVar("i", i + int(1))
+        }
+      }
+
   }
 
 }
