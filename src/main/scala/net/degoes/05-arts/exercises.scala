@@ -4,8 +4,11 @@ package net.degoes.arts
 
 import scalaz._
 import Scalaz._
+import scalaz.zio.IO
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.higherKinds
+import scala.reflect.ClassTag
 
 object exercises {
 
@@ -89,6 +92,136 @@ object exercises {
 
           putStrLn[F](s"Logging: \n$lines") *> Monad[F].point(name)
       }
+
+  }
+
+  object Teaching1 {
+
+    /**
+    *
+    *
+    *
+    * 1. Each type class represents some business subdomain, e.g. account credits/debits.
+    * 2. All methods in the type class relate to each other through algebraic or operational laws.
+    *    transact(debit(account, amount) *> credit(account, amount)) === balance(account)
+    * 3. Delete all methods that don't relate to others through algebraic or operational laws
+    * 4. All operations should be able to be expressed in terms of a small set of orthogonal operations
+    * 5. It's a good sign if you can express one type class in terms of another, lower-level one
+    *
+    * TODO: Any point I missed ?
+    */
+
+  }
+
+  object Teaching2 {
+    type Geocode
+    type Response
+    type Value
+
+    /**
+      * `map` && `flatMap` could also be implemented thanks to an Monad[Effect[E, ?]\] instance in the companion object.
+      * Performances could be a little less.
+      *
+      */
+    case class Effect[E, A](run: Future[Either[E, Option[A]]]) {
+      def map[B](f: A => B)(implicit ec: ExecutionContext): Effect[E, B] = Effect(run.map(_.map(_.map(f))))
+      def flatMap[B](f: A => Effect[E, B])(implicit ec: ExecutionContext): Effect[E, B] =
+        Effect(run.flatMap {
+          case Left(e)        => Future.successful(Left(e))
+          case Right(None)    => Future.successful(Right(None))
+          case Right(Some(a)) => f(a).run
+        })
+    }
+    object Effect {
+      def point[E, A](a: => A): Effect[E, A] = Effect(Future.successful(Right(Some(a))))
+    }
+
+    def geoAPI[E](url: String): Effect[E, Geocode]           = ???
+    def cacheAPI[E](key: Array[Byte]): Effect[E, Value]      = ???
+    def queryDatabase[E](query: String): Effect[E, Response] = ???
+
+    /**
+      * Second possibility
+      *
+      * (
+      *   doesn't compile:
+      *     [error] type Λ$ takes type parameters
+      *     [error]     type MonadTransformerBasedEffect[E, A] = OptionT[EitherT[Future, E, ?], ?]
+      * )
+      *
+      */
+    //type MonadTransformerBasedEffect[E, A] = OptionT[EitherT[Future, E, ?], ?]
+
+    /**
+      * Third possibility
+      */
+    trait PerformantEffect[F[_, _]] {
+      def monad[E]: Monad[F[E, ?]]
+
+      def fail[E, A](e: E): F[E, A]
+
+      def attempt[E, A](fea: F[E, A]): F[Nothing, Either[E, A]]
+
+      def none[E, A]: F[E, A]
+
+      def some[E, A](a: A): F[E, A]
+
+      def fromFuture[E, A](f: Future[A]): F[E, A]
+    }
+    object PerformantEffect {
+      type MyIO[E, A] = IO[Option[E], A]
+
+      implicit val EffectMyIO: PerformantEffect[MyIO] =
+        new PerformantEffect[MyIO] {
+          def monad[E]: Monad[MyIO[E, ?]] =
+            new Monad[MyIO[E, ?]] {
+              def point[A](a: => A): MyIO[E, A]                              = IO.point(a)
+              def bind[A, B](fa: MyIO[E, A])(f: A => MyIO[E, B]): MyIO[E, B] = fa.flatMap(f)
+            }
+
+          def fail[E, A](e: E): MyIO[E, A] = IO.fail(Some(e))
+
+          def attempt[E, A](fea: MyIO[E, A]): MyIO[Nothing, Either[E, A]] = fea.attempt.flatMap {
+            case Left(None)    => IO.fail(None)
+            case Left(Some(e)) => IO.now(Left(e))
+            case Right(a)      => IO.now(Right(a))
+          }
+
+          def none[E, A]: MyIO[E, A] = IO.fail[Option[E]](None)
+
+          def some[E, A](a: A): MyIO[E, A] = IO.now(a)
+
+          def fromFuture[E, A](f: Future[A]): MyIO[E, A] = ???
+        }
+    }
+
+    type Task[A]
+    type MyTask[E, A] = EitherT[Task, E, A]
+    implicit val EffectTask: PerformantEffect[MyTask] =
+      new PerformantEffect[MyTask] {
+        override def monad[E]: Monad[MyTask[E, ?]]                                   = ???
+        override def fail[E, A](e: E): MyTask[E, A]                                  = ???
+        override def attempt[E, A](fea: MyTask[E, A]): MyTask[Nothing, Either[E, A]] = ???
+        override def none[E, A]: MyTask[E, A]                                        = ???
+        override def some[E, A](a: A): MyTask[E, A]                                  = ???
+        override def fromFuture[E, A](f: Future[A]): MyTask[E, A]                    = ???
+      }
+
+    type MyTerribleTask[E, A] = Task[A]
+    case class MyTerribleError[E: ClassTag](error: E) extends Throwable
+    implicit def EffectMyTerribleError[E0: ClassTag]: PerformantEffect[MyTerribleTask] =
+      new PerformantEffect[MyTerribleTask] {
+        override def monad[E]: Monad[MyTerribleTask[E, ?]]                                           = ???
+        override def fail[E, A](e: E): MyTerribleTask[E, A]                                          = ???
+        override def attempt[E, A](fea: MyTerribleTask[E, A]): MyTerribleTask[Nothing, Either[E, A]] = ???
+        override def none[E, A]: MyTerribleTask[E, A]                                                = ???
+        override def some[E, A](a: A): MyTerribleTask[E, A]                                          = ???
+        override def fromFuture[E, A](f: Future[A]): MyTerribleTask[E, A]                            = ???
+      }
+
+    def polyGeoAPI[F[_, _], E](url: String): F[E, Geocode]           = ???
+    def polyCacheAPI[F[_, _], E](key: Array[Byte]): F[E, Value]      = ???
+    def polyQueryDatabase[F[_, _], E](query: String): F[E, Response] = ???
 
   }
 
