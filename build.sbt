@@ -40,6 +40,7 @@ javacOptions ++= Seq("-Xlint:unchecked", "-Xlint:deprecation", "-source", "1.7",
 val CatsEffectVersion = "1.0.0-RC3"
 val ScalaZVersion     = "7.2.23"
 val ZIOVersion        = "0.2.6"
+val silencerVersion   = "1.2"
 
 libraryDependencies ++= Seq(
   // -- testing --
@@ -52,7 +53,10 @@ libraryDependencies ++= Seq(
   "org.scalaz"      %% "scalaz-zio"         % ZIOVersion,
   "org.scalaz"      %% "scalaz-zio-interop" % ZIOVersion,
   // Ammonite
-  "com.lihaoyi"     %  "ammonite"           % "1.1.2"   % "test" cross CrossVersion.full
+  "com.lihaoyi"     %  "ammonite"           % "1.1.2"   % "test" cross CrossVersion.full,
+  // Jules
+  compilerPlugin("com.github.ghik" %% "silencer-plugin" % silencerVersion),
+  "com.github.ghik" %% "silencer-lib" % silencerVersion % Provided
 )
 
 resolvers ++= Seq(

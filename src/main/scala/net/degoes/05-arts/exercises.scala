@@ -4,6 +4,7 @@ package net.degoes.arts
 
 import scalaz._
 import Scalaz._
+import com.github.ghik.silencer.silent
 import scalaz.zio.IO
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -358,6 +359,116 @@ object exercises {
           Expr[F].updateVar("i", i + int(1))
         }
       }
+
+  }
+
+  object TeachingFunctors {
+
+    /**
+      * Monadic Parser
+      */
+    case class Parser0[+E, +A](run: String => Either[E, (String, A)])
+
+    /**
+      * Applicative Parser
+      */
+    sealed trait Parser[+E, +A] { self =>
+      def map[B](f: A => B): Parser[E, B] = Parser.Map[E, A, B](self, f)
+
+      def ||[E1 >: E, B](that: Parser[E1, B]): Parser[E1, Either[A, B]] = Parser.Alternative(self, that)
+
+      def * : Parser[E, List[A]] = Parser.Repeat(self)
+
+      def ~[E1 >: E, B](that: Parser[E1, B]): Parser[E1, (A, B)] = Parser.Zip(self, that)
+
+      def <*[E1 >: E, B](that: Parser[E1, B]): Parser[E1, A] = (self ~ that).map(_._1)
+
+      def *>[E1 >: E, B](that: Parser[E1, B]): Parser[E1, B] = (self ~ that).map(_._2)
+    }
+    object Parser {
+      def fail[E](e: E): Parser[E, Nothing] = Fail(e)
+
+      def char[E](e: E): Parser[E, Char] = Character(e)
+
+      def select[E, A](cond: Parser[E, Boolean])(ifTrue: Parser[E, A], ifFalse: Parser[E, A]) =
+        Select(cond, ifTrue, ifFalse)
+
+      case class Fail[E](error: E)                                             extends Parser[E, Nothing]
+      case class Succceed[A](value: A)                                         extends Parser[Nothing, A]
+      case class Character[E](error: E)                                        extends Parser[E, Char]
+      case class Repeat[E, A](value: Parser[E, A])                             extends Parser[E, List[A]]
+      case class Alternative[E, A, B](left: Parser[E, A], right: Parser[E, B]) extends Parser[E, Either[A, B]]
+      case class Zip[E, A, B](left: Parser[E, A], right: Parser[E, B])         extends Parser[E, (A, B)]
+      case class Map[E, A0, A](value: Parser[E, A0], f: A0 => A)               extends Parser[E, A]
+
+      /**
+        * Selectable Functor
+        */
+      case class Select[E, A](condition: Parser[E, Boolean], ifTrue: Parser[E, A], ifFalse: Parser[E, A])
+          extends Parser[E, A]
+
+      implicit def ApplicativeParser[E]: Applicative[Parser[E, ?]] =
+        new Applicative[Parser[E, ?]] {
+          override def point[A](a: => A): Parser[E, A] = Succceed(a)
+          override def ap[A, B](fa: => Parser[E, A])(f: => Parser[E, A => B]): Parser[E, B] =
+            Map[E, (A => B, A), B](Zip(f, fa), { case (f, a) => f(a) })
+        }
+    }
+
+    def compiler[E, A](parser: Parser[E, A]): String => Either[E, A] =
+      input => {
+        @silent var index    = 0
+        @silent var error: E = null.asInstanceOf[E]
+        @silent var value: A = null.asInstanceOf[A]
+        type Repr = () => Unit
+
+        def compile0(parser: Parser[E, A]): Repr = ???
+
+        compile0(parser)
+        if (error == null) Right(value) else Left(error)
+      }
+
+    sealed trait JSON
+    sealed trait JSONError
+
+    def ParserJSON: Parser[JSONError, JSON] = ???
+
+    val parseJson: String => Either[JSONError, JSON] = compiler(ParserJSON)
+  }
+
+  /**
+    * Final tagless composition
+    */
+  object Teaching4 {
+
+    trait MonadReader[R, F[_]] {
+      def read: F[R]
+    }
+    trait HasEnv1[R] {
+      def env1: Lens[R, LowDslEnv1]
+    }
+    case class LowDslEnv1()
+    def myLowDsl1[R: HasEnv1, F[_]](implicit F: MonadReader[R, F]): F[Unit] = ???
+
+    trait HasEnv2[R] {
+      def env2: Lens[R, LowDslEnv2]
+    }
+    case class LowDslEnv2()
+    def myLowDsl2[R: HasEnv2, F[_]](implicit F: MonadReader[R, F]): F[Unit] = ???
+
+    case class GlobalEnv(env1: LowDslEnv1, env2: LowDslEnv2)
+    object GlobalEnv {
+      implicit val GlobalEnvHasEnv1: HasEnv1[GlobalEnv] = ???
+      implicit val GlobalEnvHasEnv2: HasEnv2[GlobalEnv] = ???
+    }
+
+    def myProgram[F[_]](implicit F: MonadReader[GlobalEnv, F]): F[Unit] = ???
+
+  }
+
+  object TeachingFixPointDatatype {
+
+    // Waiting for JDG mail ?
 
   }
 
