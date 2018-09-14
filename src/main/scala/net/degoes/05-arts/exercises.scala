@@ -225,4 +225,98 @@ object exercises {
 
   }
 
+  /**
+    * Higher Order Abstract Syntax
+    */
+  object TeachingHigherOrderAsbtractSyntax {
+
+    /**
+      * TO ACHIEVE:
+      * -----------
+      *
+      * let i = 0
+      * in while(1 < 10) { i = i + i }
+      */
+    /**
+      * v1
+      */
+    sealed trait Expr[A]
+    final case class IntLit(value: Int)                                     extends Expr[Int]
+    final case class Add(l: Expr[Int], r: Expr[Int])                        extends Expr[Int]
+    final case class Let[A, B](name: String, value: Expr[A], body: Expr[B]) extends Expr[B]
+    final case class Value[A](name: String)                                 extends Expr[A]
+    final case class UpdateVar[A](name: String, value: Expr[A])             extends Expr[A]
+    final case class LessThan[A](left: Expr[Int], right: Expr[Int])         extends Expr[Boolean]
+    final case class While[A](condition: Expr[Boolean], body: Expr[A])      extends Expr[A]
+
+    val program: Expr[Int] =
+      Let('i, IntLit(0), While(LessThan(Value('i), IntLit(10)), UpdateVar('i, Add(Value('i), IntLit(1)))))
+
+    case class IState(value: Map[String, Any]) {
+      def addValue(name: String, value: Any): IState = copy(value = value + (name -> value))
+      def removeValue(name: String): IState          = copy(value = value - name)
+    }
+
+    type MyState[A]   = State[IState, A]
+    type Interpret[A] = EitherT[MyState, String, A]
+
+    import scalaz.zio._
+
+    def interpret[A0](p: Expr[A0], ref: Ref[IState]): IO[String, A0] = {
+      def interpret0[A](expr: Expr[A]): IO[String, A] = {
+        p match {
+          case IntLit(value) => IO.now(value)
+          case Add(l, r)     => interpret0(l).seqWith(interpret0(r))(_ + _)
+
+          case Let(name, value, body) =>
+            for {
+              v <- interpret0(value)
+              _ <- ref.update(_.addValue(name, v))
+              b <- interpret0(body)
+              _ <- ref.update(_.removeValue(name))
+            } yield b.asInstanceOf[A]
+
+          case Value(name) =>
+            for {
+              s <- ref.get
+              v <- IO.fromOption(s.value.get(name)).leftMap(_ => s"Unreferenced varialbe $name")
+            } yield v.asInstanceOf[A]
+
+          case UpdateVar(name, value) =>
+            for {
+              v <- interpret0(value)
+              _ <- ref.update(_.addValue(name, v))
+            } yield v
+
+          case LessThan(left, right) =>
+            interpret0(left).seqWith(interpret0(right))(_ < _)
+
+          case While(condition, body) =>
+            (for {
+              b <- interpret0(condition)
+              _ <- if (b) interpret0(body) else IO.unit
+            } yield b).repeat(Schedule.doWhile[Boolean](identity)).void
+        }
+      }
+
+      interpret0(p)
+    }
+
+    /*
+    /**
+   * let i = 0
+   * in while(1 < 10) { i = i + i }
+   */
+    sealed trait Expr[A]
+    final case class IntLit(value: Int)                                     extends Expr[Int]
+    final case class Add(l: Expr[Int], r: Expr[Int])                        extends Expr[Int]
+    final case class Let[A, B](name: Symbol, value: Expr[A], body: Expr[B]) extends Expr[B]
+    final case class Value[A](name: Symbol)                                 extends Expr[A]
+    final case class UpdateVar[A](name: Symbol, value: Expr[A])             extends Expr[A]
+    final case class LessThan[A](left: Expr[Int], right: Expr[Int])         extends Expr[Boolean]
+    final case class While[A](condition: Expr[Boolean], body: Expr[A])      extends Expr[A]
+
+   */
+  }
+
 }
